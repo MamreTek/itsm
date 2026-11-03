@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: 'offline.spec.ts',
   outputDir: 'artifacts/playwright',
   timeout: 45000,
   reporter: 'list',

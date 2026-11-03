@@ -1,4 +1,5 @@
 import { priorities, statuses, ticketTypes } from '../shared/api/contracts';
+import { createId } from '../shared/api/id';
 import type {
   Activity,
   CreateTicket,
@@ -74,7 +75,7 @@ export function createMockServer({
     message: string,
     at = timestamp(),
   ): Activity => ({
-    id: crypto.randomUUID(),
+    id: createId(),
     kind,
     message,
     actor: '演示处理人（模拟）',
@@ -86,7 +87,7 @@ export function createMockServer({
     sequence += 1;
     return {
       ...input,
-      id: crypto.randomUUID(),
+      id: createId(),
       number: `${input.type === 'incident' ? 'INC' : 'SR'}-${sequence}`,
       serviceId: input.serviceId || null,
       status: 'open',
@@ -132,7 +133,7 @@ export function createMockServer({
   reset();
   const transport: Transport = async (request) => {
     if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
-    const requestId = `mock-${crypto.randomUUID()}`;
+    const requestId = `mock-${createId()}`;
     const json = (data: unknown, status = 200) =>
       new Response(JSON.stringify({ data, requestId }), {
         status,

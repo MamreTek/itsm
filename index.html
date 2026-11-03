@@ -7,7 +7,37 @@
     <title>MamreTek ITSM · 服务工作台原型</title>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/app/main.tsx"></script>
+    <div id="root">
+      <section
+        id="file-guide"
+        hidden
+        style="
+          max-width: 640px;
+          margin: 72px auto;
+          padding: 24px;
+          font: 16px/1.8 system-ui;
+          color: #173f35;
+        "
+      >
+        <h1>打开 ITSM 产品原型</h1>
+        <p>
+          当前是开发入口。直接预览请从项目根目录打开
+          <a href="./offline/index.html">offline/index.html</a>。
+        </p>
+        <p>
+          如果还未生成离线文件，先在项目目录运行 <code>npm ci</code> 和
+          <code>npm run build:offline</code>，再打开该文件。开发时使用
+          <code>npm run dev</code> 给出的网址。
+        </p>
+        <p>产品原型 / 模拟数据 · 没有真实后端或权限保护，不用于生产。</p>
+      </section>
+    </div>
+    <script type="module">
+      if (window.location.protocol === 'file:') {
+        document.getElementById('file-guide').hidden = false;
+      } else {
+        import('/src/app/main.tsx');
+      }
+    </script>
   </body>
 </html>

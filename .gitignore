@@ -1,5 +1,6 @@
 node_modules/
 dist/
+offline/
 coverage/
 artifacts/
 test-results/

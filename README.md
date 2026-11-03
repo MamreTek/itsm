@@ -6,6 +6,17 @@
 
 ## 本地体验
 
+**双击 HTML 预览**：打开构建好的 `offline/index.html`，不需要启动服务或联网。JavaScript、React、Ant Design 和样式已包含在同一个文件里，可以单独复制到其他目录。此文件只包含虚构的 Mock 数据；刷新后恢复初始状态。
+
+首次从源码生成离线文件：
+
+```sh
+npm ci
+npm run build:offline
+```
+
+**开发模式**：项目根目录的 `index.html` 是 Vite 开发入口；`dist/index.html` 是普通静态服务入口。这两个入口不作为离线单文件使用。修改代码后重新执行 `npm run build:offline` 即可更新离线预览，生成目录不提交到 Git。
+
 使用 `.nvmrc` 的 Node.js 22.22.1 和 npm 9.2.0：
 
 ```sh
@@ -14,6 +25,19 @@ npm run dev
 ```
 
 打开终端给出的 `http://127.0.0.1:5173`。默认仅监听本机；不需要数据库、容器或凭据。
+
+## 展示用预览服务
+
+从项目目录执行：
+
+```sh
+npm run build:offline
+npm run preview:local
+```
+
+默认访问 `http://127.0.0.1:5193/`。需要同一局域网设备查看时，先确认本机网卡的私有 IPv4，再执行 `npm run preview:local -- --lan-host <本机局域网IPv4>`；终端会列出本机与局域网地址。服务只绑定回环和明确指定的本机私有地址，不接受通配或公网绑定，不修改防火墙。端口占用时直接报错，不替换已有服务。
+
+此服务只提供内存中已构建的单个 HTML，不提供仓库文件或真实 API。保持运行的终端打开，按 Ctrl+C 停止；也可对终端输出的 PID 执行 `kill <PID>`。更新代码后停止服务，重新构建并启动。每个浏览器页面的模拟数据互相独立，刷新即重置，不在设备间同步。
 
 1. 打开「服务目录」，选择一项服务，填写请求人和需求并提交。
 2. 在详情中分派处理人，开始处理并追加记录。
@@ -45,6 +69,8 @@ npm run check
 # 可选完整浏览器流程（首次需安装 Chromium）
 npx playwright install chromium
 npm run test:e2e
+# file:// 离线回归：复制单文件、断网、完成服务申请与工单闭环
+npm run test:offline
 ```
 
 本期对应 [REQ-001 / Issue #1](https://github.com/MamreTek/itsm/issues/1)。没有真实通知、附件、审批、流程设计器、数据库或新增权限系统；不宣称生产就绪。

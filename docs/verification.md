@@ -8,7 +8,7 @@
 | --- | --- |
 | npm run lint | 通过，0 错误/警告 |
 | npm run typecheck | 通过，strict TypeScript |
-| npm test | 2 个测试文件，9 项通过 |
+| npm test | 2 个测试文件，10 项通过，包含普通 HTTP 环境的 Mock 标识符兼容性 |
 | npm run build | 通过，生成本地 dist，未部署 |
 | npm run test:e2e | Chromium 桌面 1440×1000、手机 390×664，4 项通过 |
 | npm audit --omit=dev --json | 运行依赖 0 项告警 |
@@ -25,3 +25,14 @@
 - 浏览器检查使用 Chromium 的桌面与手机宽度模拟，未覆盖真实 iOS Safari、屏幕阅读器或完整无障碍审查。
 
 真实认证、权限、通知、持久化和生产部署均未实现、未验证。
+
+## 直接打开 HTML 与本机展示修复
+
+根因：源码 index.html 原本直接请求 `/src/app/main.tsx`，file:// 打开时解析为 file:///src/app/main.tsx，触发 CORS 并显示空白。现在源码入口给出打开方式指引；`npm run build:offline` 从同一应用生成约 1115 KiB 的单个 HTML，脚本和样式全部内联。
+
+- `npm run test:offline`：2 项通过。源码指引能打开离线文件；单文件复制到含中文与空格的独立空目录，关闭网络后完成创建、分派、处理、解决、关闭及刷新重置。控制台错误 0，网络资源请求 0。
+- `npm run check`：lint、strict typecheck、10 项测试、HTTP 构建全部通过；离线构建另行通过。
+- `npm run preview:local`：在回环地址与明确指定的本机 Wi-Fi 私有 IPv4 上启动展示服务。实际 Chromium 分别访问这两个地址，均返回 200 并走完工单闭环，控制台错误 0。私有 HTTP 环境中 randomUUID 不可用的情况已通过实际浏览器验证；Mock ID 回退使用 getRandomValues，不改变认证或权限设置。
+- 展示服务拒绝仓库路径（/.git/config 与 /src/app/main.tsx 均 404），只允许 GET/HEAD（POST 为 405），favicon 返回 204。没有通配地址、公网部署、隧道或防火墙修改。
+- 局域网地址仅从当前电脑访问验证，其他实际设备和网络隔离策略未实测。模拟数据按页面独立，不在浏览器或设备间同步。
+- 本次修复按展示要求留在本机，未上传到远端或合并 PR；原有远端 CI 结果不代表这次本地修复。离线回归已加入 CI 配置，待后续推送时运行。

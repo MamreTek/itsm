@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockServer } from '../mocks/transport';
 import { createClient } from '../shared/api/client';
 import type { CreateTicket } from '../shared/api/contracts';
@@ -20,6 +20,37 @@ beforeEach(() => {
 });
 
 describe('v1 workflow contract', () => {
+  it('keeps Mock tickets usable on private HTTP origins without randomUUID', async () => {
+    const originalCrypto = globalThis.crypto;
+    vi.stubGlobal('crypto', {
+      getRandomValues: originalCrypto.getRandomValues.bind(originalCrypto),
+    });
+    try {
+      const localApi = createClient(
+        createMockServer({ delay: 0, now }).transport,
+      );
+      const ticket = await localApi.create(input);
+      expect(ticket.id).toBeTruthy();
+      expect((await localApi.detail(ticket.id)).number).toBe(ticket.number);
+      const assigned = await localApi.assign(
+        ticket.id,
+        'person-demo-2',
+        ticket.version,
+      );
+      expect(
+        (
+          await localApi.transition(
+            ticket.id,
+            'start',
+            '演示处理',
+            assigned.version,
+          )
+        ).status,
+      ).toBe('in_progress');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
   it('creates a catalog ticket, assigns, processes, records, resolves and closes it', async () => {
     let ticket = await api.create(input);
     expect(ticket).toMatchObject({
