@@ -57,7 +57,7 @@ export function LoadState({
         showIcon
         title="请求失败"
         description={error}
-        action={<Button onClick={retry}>重试</Button>}
+        action={<Button aria-label="重试" onClick={retry}>重试</Button>}
       />
     );
   if (empty)

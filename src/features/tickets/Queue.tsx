@@ -99,7 +99,7 @@ export function Queue() {
               onChange={(e) => setSearch(e.target.value)}
               onSearch={(q) => update({ q })}
               allowClear
-              enterButton="搜索"
+              enterButton={<Button type="primary" aria-label="搜索">搜索</Button>}
             />
           </Form.Item>
           <Form.Item label="工单状态" htmlFor="ticket-status">
@@ -163,6 +163,7 @@ export function Queue() {
           </Form.Item>
           <Form.Item className="filter-actions">
             <Button
+              aria-label="重置筛选"
               onClick={() => {
                 setSearch('');
                 setSelected([]);
@@ -179,7 +180,7 @@ export function Queue() {
         title="工单列表"
         extra={
           <Space role="toolbar" aria-label="工单操作">
-            <Button disabled={!selected.length || resource.loading || !!resource.error || directory.loading || !!directory.error}
+            <Button aria-label="批量分派" disabled={!selected.length || resource.loading || !!resource.error || directory.loading || !!directory.error}
               onClick={() => setAssigning(resource.data?.items.filter(ticket => selected.includes(ticket.id)))}>
               批量分派
             </Button>

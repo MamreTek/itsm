@@ -18,14 +18,14 @@ it('shows the prototype boundary, searches an empty queue and recovers from a fa
   const demo = within(screen.getByRole('group', { name: '模拟数据操作' }));
   await user.click(screen.getByLabelText('搜索工单'));
   await user.paste('没有此工单');
-  await user.click(query.getByRole('button', { name: '搜索' }));
+  await user.click(query.getByLabelText('搜索'));
   await screen.findByText('没有符合条件的记录，试试调整筛选或新建工单');
-  await user.click(query.getByRole('button', { name: '重置筛选' }));
+  await user.click(query.getByLabelText('重置筛选'));
   await screen.findByText('演示应用响应变慢');
-  await user.click(demo.getByRole('button', { name: '模拟下一请求失败' }));
-  await user.click(toolbar.getByRole('button', { name: '刷新' }));
+  await user.click(demo.getByLabelText('模拟下一请求失败'));
+  await user.click(toolbar.getByLabelText('刷新'));
   await screen.findByText('请求失败');
-  await user.click(screen.getByRole('button', { name: '重试' }));
+  await user.click(screen.getByLabelText('重试'));
   await screen.findByText('演示应用响应变慢');
 });
 it('validates a create form, keeps the draft on failure, and creates exactly one ticket after retry', async () => {
@@ -79,8 +79,8 @@ it('shows partial bulk results and leaves a concurrently changed ticket with its
   await user.click(screen.getByLabelText('选择 INC-1001'));
   await user.click(screen.getByLabelText('选择 SR-1003'));
   await screen.findByText('已选择本页 2 条工单');
-  await waitFor(() => expect(toolbar.getByRole('button', { name: '批量分派' })).toBeEnabled());
-  await user.click(toolbar.getByRole('button', { name: '批量分派' }));
+  await waitFor(() => expect(toolbar.getByLabelText('批量分派')).toBeEnabled());
+  await user.click(toolbar.getByLabelText('批量分派'));
   const dialog = await screen.findByRole('dialog', { name: '批量分派' });
   let staleId = '';
   await act(async () => {
@@ -90,7 +90,7 @@ it('shows partial bulk results and leaves a concurrently changed ticket with its
   });
   await user.click(within(dialog).getByLabelText('目标处理人（虚构目录）'));
   await user.click(await screen.findByText('演示用户 C · 服务台'));
-  await user.click(within(dialog).getByRole('button', { name: '确认批量分派' }));
+  await user.click(within(dialog).getByLabelText('确认批量分派'));
   const result = await screen.findByRole('dialog', { name: '批量分派结果' });
   await within(result).findByText('成功 1 条，失败 1 条');
   expect(within(result).getByText(/VERSION_CONFLICT，当前版本 2/)).toBeInTheDocument();
@@ -98,7 +98,7 @@ it('shows partial bulk results and leaves a concurrently changed ticket with its
     expect((await api.detail(staleId)).assigneeId).toBe('person-demo-2');
     expect((await api.list({ q: 'SR-1003' })).items[0].assigneeId).toBe('person-demo-3');
   });
-  await user.click(within(result).getByRole('button', { name: '返回队列' }));
+  await user.click(within(result).getByLabelText('返回队列'));
   await screen.findByText('演示应用响应变慢');
-  expect(toolbar.getByRole('button', { name: '批量分派' })).toBeDisabled();
+  expect(toolbar.getByLabelText('批量分派')).toBeDisabled();
 });

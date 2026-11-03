@@ -161,6 +161,7 @@ function Shell() {
             </span>
             <Space wrap role="group" aria-label="模拟数据操作">
               <Button
+                aria-label="模拟下一请求失败"
                 size="small"
                 onClick={() => {
                   mock.failNext();

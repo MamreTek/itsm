@@ -39,8 +39,8 @@ export function BulkAssignment({ tickets, people, onClose, onSettled }: {
     mask={{ closable: !busy }}
     keyboard={!busy}
     footer={result
-      ? <Button type="primary" onClick={onClose}>返回队列</Button>
-      : <><Button disabled={busy} onClick={onClose}>取消</Button><Button type="primary" loading={busy} onClick={() => form.submit()}>确认批量分派</Button></>}
+      ? <Button aria-label="返回队列" type="primary" onClick={onClose}>返回队列</Button>
+      : <><Button disabled={busy} onClick={onClose}>取消</Button><Button aria-label="确认批量分派" type="primary" loading={busy} onClick={() => form.submit()}>确认批量分派</Button></>}
   >
     {error && <Alert className="form-error" type="error" showIcon title="分派请求失败" description={error} />}
     {result ? <Alert className="form-error" showIcon type={result.failed.length ? 'warning' : 'success'}
