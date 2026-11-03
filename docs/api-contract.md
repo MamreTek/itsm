@@ -2,6 +2,8 @@
 
 状态：**原型契约，真实服务未实现**。权威字段类型见 `src/shared/api/contracts.ts`；Mock 在 `src/mocks/transport.ts`。前端统一通过 `src/shared/api/client.ts`。无真实身份认证，所有人员/服务/工单均虚构。
 
+用户后续追加的流程定义、校验与模拟实例契约见 [流程设计与编排 API](workflow-api.md)，沿用本页通用响应与错误语义。
+
 ## 通用结构
 
 基础路径 `/api/v1`；请求/响应 `application/json`。成功使用 200，创建工单使用 201。响应头 `X-Request-ID` 与 JSON 中 `requestId` 一致，Mock 前缀 `mock-`。ID 为不透明字符串，不能从编号推断；`number` 为可读工单号，仅用于展示与搜索。所有时间为 ISO 8601 UTC。

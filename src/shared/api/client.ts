@@ -15,6 +15,7 @@ import type {
   Transport,
 } from './contracts';
 import { createMockServer } from '../../mocks/transport';
+import type { FlowValidation, RunAction, RunInputs, Workflow, WorkflowDraft, WorkflowRun } from './workflows';
 
 export class ApiError extends Error {
   constructor(
@@ -66,6 +67,14 @@ export function createClient(transport: Transport) {
     }
   };
   return {
+    workflows: () => request<Workflow[]>('/workflows'),
+    workflow: (id: string) => request<Workflow>(`/workflows/${encodeURIComponent(id)}`),
+    createWorkflow: (draft: WorkflowDraft) => request<Workflow>('/workflows', 'POST', draft),
+    saveWorkflow: (id: string, draft: WorkflowDraft, version: number) => request<Workflow>(`/workflows/${encodeURIComponent(id)}`, 'PUT', { ...draft, version }),
+    validateWorkflow: (draft: WorkflowDraft) => request<FlowValidation>('/workflows/validate', 'POST', draft),
+    createRun: (workflowId: string, workflowVersion: number, inputs: RunInputs) => request<WorkflowRun>('/workflow-runs', 'POST', { workflowId, workflowVersion, inputs }),
+    run: (id: string) => request<WorkflowRun>(`/workflow-runs/${encodeURIComponent(id)}`),
+    runAction: (id: string, version: number, action: RunAction, note: string) => request<WorkflowRun>(`/workflow-runs/${encodeURIComponent(id)}/actions`, 'POST', { version, action, note }),
     list: (query: TicketQuery = {}) => {
       const params = new URLSearchParams();
       Object.entries(query).forEach(([key, value]) => {

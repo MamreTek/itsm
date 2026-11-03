@@ -16,6 +16,14 @@ UI → 统一 API 客户端 → 注入的 Fetch-compatible transport → Mock �
 
 `useResource` 管理加载、失败和重试，忽略卸载后及过期请求结果。写操作防重复点击，不自动重试；API 错误包含请求标识，409 明确要求刷新，不静默覆盖新版本。模拟数据仅活在内存中，刷新/重置即恢复初始数据。
 
+## 流程定义与模拟编排
+
+`src/features/workflows` 提供设计器、SVG/DOM 画布与模拟面板。`src/shared/api/workflows.ts` 是契约，`src/shared/workflow/model.ts` 是纯图校验；`src/mocks/workflows.ts` 负责草稿版本、冻结实例、分支选择与逐步模拟，仍由既有 transport 提供统一 envelope 和故障注入。没有引入第三方图引擎、Ferry 源码或服务。
+
+保存允许语义未完成的草稿，结构错误请求不写入。只有无环且完整的已保存图可模拟。启动时复制流程与输入，等待节点动作在实例副本上校验、推进后才提交；后续定义编辑不改变实例。条件只有枚举等值比较，不执行脚本；节点负责人是虚构目录引用，不是身份或权限。流程模拟与原工单状态机相互独立，重置同时恢复两者。
+
+真实后端需要重新设计持久化版本、并发比较、未知写入结果查询、身份和资源授权；当前内存图校验与同步模拟不能替代生产工作流引擎。详细语义见 [工作流 API](workflow-api.md)，参考来源与访问限制见 [Ferry 核验记录](workflow-reference.md)。
+
 ## 离线预览构建
 
 `scripts/build-offline.mjs` 复用同一 `src/app/main.tsx` 和 Vite/React 编译链，以 IIFE 格式生成一个脚本，将 CSS 内联到 `offline/index.html`。不依赖 CDN、同级资源文件、开发服务器或跨文件访问例外；构建发现额外脚本/资源依赖时直接失败。生成文件被 Git 忽略，不携带本机路径或源码映射。源码 HTML 在 file:// 下显示打开指引，不再尝试请求 TSX。

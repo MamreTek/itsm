@@ -1,6 +1,7 @@
 import { actionText, priorities, statuses, ticketTypes, ticketViews } from '../shared/api/contracts';
 import { assessSla, isActiveTicket, matchesView } from '../shared/api/sla';
 import { createId } from '../shared/api/id';
+import { createWorkflowStore, WorkflowProblem } from './workflows';
 import type {
   Activity,
   BulkAssignmentInput,
@@ -73,6 +74,7 @@ export function createMockServer({
   let policies: SlaPolicy[] = structuredClone(seedPolicies);
   let sequence = 1000;
   let shouldFail = false;
+  const workflowStore = createWorkflowStore(now);
   const timestamp = () => new Date(now()).toISOString();
   const activity = (
     kind: Activity['kind'],
@@ -115,6 +117,7 @@ export function createMockServer({
     };
   };
   const reset = () => {
+    workflowStore.reset();
     sequence = 1000;
     policies = structuredClone(seedPolicies);
     shouldFail = false;
@@ -179,6 +182,8 @@ export function createMockServer({
         if (!body || Array.isArray(body) || typeof body !== 'object')
           fail(400, 'INVALID_JSON', '请求必须是 JSON 对象');
       }
+      const workflowResponse = workflowStore.handle(path, method, body);
+      if (workflowResponse) return json(workflowResponse.data, workflowResponse.status);
       if (path === '/api/v1/catalog' && method === 'GET') return json(services);
       if (path === '/api/v1/directory' && method === 'GET') return json(people);
       if (path === '/api/v1/sla-policies' && method === 'GET')
@@ -363,7 +368,7 @@ export function createMockServer({
       }
       fail(404, 'NOT_FOUND', '接口不存在');
     } catch (error) {
-      if (!(error instanceof Problem)) throw error;
+      if (!(error instanceof Problem) && !(error instanceof WorkflowProblem)) throw error;
       const body: Failure = {
         error: {
           code: error.code,

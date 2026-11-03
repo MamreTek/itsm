@@ -90,3 +90,37 @@ test('one copied HTML runs the complete Mock workflow offline without console or
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('copied offline HTML saves a workflow and simulates its rejection branch without external resources', async ({ page, context }) => {
+  const directory = await mkdtemp(join(tmpdir(), 'ITSM 流程离线验证 '));
+  const file = join(directory, 'index.html');
+  const errors: string[] = [];
+  const requests: string[] = [];
+  page.on('console', entry => { if (entry.type() === 'error') errors.push(entry.text()); });
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('request', request => requests.push(request.url()));
+  try {
+    await copyFile(resolve('offline/index.html'), file);
+    await context.setOffline(true);
+    await page.goto(`${pathToFileURL(file).href}#/workflows`);
+    await expect(page.getByText('流程校验通过', { exact: true })).toBeVisible();
+    await page.getByLabel('流程名称').fill('离线流程演示');
+    await page.getByRole('button', { name: '保存草稿', exact: true }).click();
+    await expect(page.getByText('已保存 v2 · 可模拟', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '模拟运行', exact: true }).click();
+    const drawer = page.getByRole('dialog', { name: '流程模拟（Mock）', exact: true });
+    await drawer.getByRole('button', { name: '启动模拟', exact: true }).click();
+    await expect(drawer.getByText('当前节点：服务台审批', { exact: true })).toBeVisible();
+    await drawer.getByLabel('模拟操作说明', { exact: true }).fill('离线虚构请求：模拟拒绝');
+    await drawer.getByRole('button', { name: '模拟拒绝', exact: true }).click();
+    await expect(drawer.getByText('已按拒绝分支结束模拟', { exact: true })).toBeVisible();
+    await drawer.getByRole('button', { name: '关闭', exact: true }).click();
+    await page.reload();
+    await expect(page.getByLabel('流程名称')).toHaveValue('服务申请分流');
+    await expect(page.getByRole('button', { name: '查看上次模拟', exact: true })).toHaveCount(0);
+    expect(errors).toEqual([]);
+    expect(requests.every(url => url.startsWith('file:') && new URL(url).pathname.endsWith('/index.html'))).toBe(true);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

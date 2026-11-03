@@ -38,6 +38,7 @@ import { Queue } from '../features/tickets/Queue';
 import { Catalog } from '../features/catalog/Catalog';
 import { Detail } from '../features/tickets/Detail';
 import { Policies } from '../features/sla/Policies';
+import { Designer } from '../features/workflows/Designer';
 import './styles.css';
 
 function Shell() {
@@ -58,7 +59,7 @@ function Shell() {
       ? '服务目录'
       : activeKey === '/sla'
         ? 'SLA 策略'
-        : '工单队列';
+        : activeKey === '/workflows' ? '流程中心' : '工单队列';
   const items = [
     {
       key: '/tickets',
@@ -69,6 +70,11 @@ function Shell() {
       key: '/catalog',
       icon: <AppstoreOutlined />,
       label: <Link to="/catalog">服务目录</Link>,
+    },
+    {
+      key: '/workflows',
+      icon: <DeploymentUnitOutlined />,
+      label: <Link to="/workflows">流程中心</Link>,
     },
     {
       key: '/sla',
@@ -134,7 +140,7 @@ function Shell() {
             type="warning"
             showIcon
             title="产品原型 / 模拟数据"
-            description="没有真实后端或权限保护，请勿输入真实敏感信息。刷新浏览器会重置工单；仅供流程评审，不可用于生产。"
+            description="没有真实后端或权限保护，请勿输入真实敏感信息。刷新浏览器会重置全部模拟数据；仅供流程评审，不可用于生产。"
           />
           <div key={revision}>
             <Routes>
@@ -142,6 +148,7 @@ function Shell() {
               <Route path="/tickets/:id" element={<Detail />} />
               <Route path="/catalog" element={<Catalog />} />
               <Route path="/sla" element={<Policies />} />
+              <Route path="/workflows" element={<Designer />} />
               <Route path="*" element={<Navigate replace to="/tickets" />} />
             </Routes>
           </div>
@@ -201,7 +208,7 @@ function Shell() {
         cancelText="保留当前数据"
       >
         <p>
-          本次演示创建的工单、处理记录和 SLA 修改将被清空，恢复虚构的初始记录。
+          本次演示创建的工单、处理记录、SLA 修改、流程草稿和模拟实例将被清空，恢复虚构的初始记录。
         </p>
       </Modal>
     </Layout>
