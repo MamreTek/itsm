@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+artifacts/
+test-results/
+playwright-report/
+.env*
+!.env.example
+.codex/
+.agents/
+AGENTS.md
+*.local
