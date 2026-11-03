@@ -142,9 +142,6 @@ h1 {
   gap: 16px;
   margin-bottom: 16px;
 }
-.metrics .ant-card-body {
-  padding: 16px 24px;
-}
 .metrics .ant-statistic-title {
   color: rgba(0, 0, 0, 0.65);
   font-size: 13px;
@@ -153,6 +150,38 @@ h1 {
   color: rgba(0, 0, 0, 0.88);
   font-size: 24px;
   line-height: 32px;
+}
+.metrics .ant-card-body {
+  padding: 0;
+}
+.metric-button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 16px 24px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+.metric-button:hover {
+  background: #fafafa;
+}
+.metric-button:focus-visible {
+  outline: 2px solid #1677ff;
+  outline-offset: -2px;
+}
+.metric-selected {
+  border-color: #1677ff;
+}
+.selection-notice {
+  margin-bottom: 16px;
+}
+.sla-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 .query-card {
   margin-bottom: 16px;
@@ -380,7 +409,10 @@ h1 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
   }
-  .metrics .ant-card-body {
+  .metrics .ant-card .ant-card-body {
+    padding: 0;
+  }
+  .metric-button {
     padding: 16px;
   }
   .filters.ant-form,
@@ -394,6 +426,17 @@ h1 {
   }
   .ant-card .ant-card-body {
     padding: 16px;
+  }
+  .queue-card .ant-card-head-wrapper {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 0;
+  }
+  .queue-card .ant-card-head-title {
+    flex-basis: 100%;
+  }
+  .queue-card .ant-card-extra {
+    margin-inline-start: 0;
   }
   .prototype-banner {
     margin-bottom: 16px;

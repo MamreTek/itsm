@@ -70,3 +70,28 @@ it('validates a create form, keeps the draft on failure, and creates exactly one
   expect((await api.list({ q: '新增演示故障流程' })).total).toBe(1);
   expect(screen.getByText('先分派处理人，再开始处理。')).toBeInTheDocument();
 });
+
+it('shows partial bulk results and leaves a concurrently changed ticket with its latest owner', async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await screen.findByText('演示应用响应变慢');
+  await user.click(screen.getByLabelText('选择 INC-1001'));
+  await user.click(screen.getByLabelText('选择 SR-1003'));
+  await screen.findByText('已选择本页 2 条工单');
+  await waitFor(() => expect(screen.getByRole('button', { name: '批量分派' })).toBeEnabled());
+  await user.click(screen.getByRole('button', { name: '批量分派' }));
+  const dialog = await screen.findByRole('dialog', { name: '批量分派' });
+  const stale = (await api.list({ q: 'INC-1001' })).items[0];
+  await api.assign(stale.id, 'person-demo-2', stale.version);
+  await user.click(within(dialog).getByLabelText('目标处理人（虚构目录）'));
+  await user.click(await screen.findByText('演示用户 C · 服务台'));
+  await user.click(within(dialog).getByRole('button', { name: '确认批量分派' }));
+  const result = await screen.findByRole('dialog', { name: '批量分派结果' });
+  await within(result).findByText('成功 1 条，失败 1 条');
+  expect(within(result).getByText(/VERSION_CONFLICT，当前版本 2/)).toBeInTheDocument();
+  expect((await api.detail(stale.id)).assigneeId).toBe('person-demo-2');
+  expect((await api.list({ q: 'SR-1003' })).items[0].assigneeId).toBe('person-demo-3');
+  await user.click(within(result).getByRole('button', { name: '返回队列' }));
+  await screen.findByText('演示应用响应变慢');
+  expect(screen.getByRole('button', { name: '批量分派' })).toBeDisabled();
+});

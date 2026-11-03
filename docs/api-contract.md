@@ -35,16 +35,17 @@
 | 422  | VALIDATION_ERROR / ASSIGNEE_REQUIRED | 字段或引用无效；修正字段/先分派处理人                 |
 | 503  | MOCK_UNAVAILABLE                     | 演示故障，仅消费一次；原输入保留，可重试              |
 
-当前模拟写失败不改变数据。客户端不自动重试写操作，提交中锁定按钮；真正网络中断的未知写入结果、幂等键及安全控制需在真实后端接入前完善。
+当前模拟请求级写失败不改变数据；批量分派的 200 响应可以包含逐条成功与失败，详见下节。客户端不自动重试写操作，提交中锁定按钮；真正网络中断的未知写入结果、幂等键及安全控制需在真实后端接入前完善。
 
 ## 端点
 
 | 方法与路径                     | 请求                                            | data 类型        |
 | ------------------------------ | ----------------------------------------------- | ---------------- |
-| GET /tickets                   | q、status、priority、type、sort、page、pageSize | TicketList       |
+| GET /tickets                   | view、q、status、priority、type、assigneeId、requesterId、sort、page、pageSize | TicketList       |
 | POST /tickets                  | CreateTicket                                    | Ticket（201）    |
 | GET /tickets/{id}              | 无                                              | Ticket           |
 | PUT /tickets/{id}/assignment   | assigneeId、version                             | 更新后 Ticket    |
+| POST /tickets/bulk-assignment  | assigneeId、items[{id,version}]                  | BulkAssignmentResult |
 | POST /tickets/{id}/transitions | action、note、version                           | 更新后 Ticket    |
 | POST /tickets/{id}/comments    | message、version                                | 更新后 Ticket    |
 | GET /catalog                   | 无                                              | Service[]        |
@@ -71,8 +72,25 @@ GET `/tickets?q=SR-1006&type=service_request&priority=P3&status=open&sort=create
 - q 对编号与标题做不区分大小写的子串匹配，去首尾空白，≤120 字；默认空；其余筛选按精确枚举值匹配，多条件为 AND。
 - sort 为 createdAt:desc（默认）/ createdAt:asc；时间相同时按 number 升序保持稳定。
 - page 为 1–100000 的整数，默认 1；pageSize 为 1–100 的整数，默认 10；越界页返回 items=[] 和原始 total。错误参数返回 400。
-- TicketList：items 为该页 Ticket[]，total 为筛选后的总数，page、pageSize 为归一化查询值，summary 来自**未筛选的全部记录**。
-- summary.active：open/in_progress；unassigned：活跃且无处理人；breached：活跃中尚未响应且响应目标已过，或解决目标已过；resolved：resolved/closed。不是历史 SLA 达标率。
+- view 为 all（默认）/ active（open、in_progress）/ unassigned（活跃且无处理人）/ sla_breached（活跃且尚未履约目标超时）/ resolved（resolved、closed）；与其他筛选按 AND 组合。assigneeId、requesterId 必须存在于目录，否则 400；省略代表不限制。未知 view 返回 400。
+- TicketList：items 为该页 Ticket[]，total 为筛选后的总数，page、pageSize 为归一化查询值，evaluatedAt 是本次列表评估的 ISO UTC 时间，summary 来自**未筛选的全部记录**。列表、视图、统计在同一个 evaluatedAt 计算，UI 使用该值展示 SLA 状态，刷新列表后重新评估。
+- summary.active：open/in_progress；unassigned：活跃且无处理人；breached：活跃中尚未响应且响应目标已过，或尚未解决且解决目标已过；resolved：resolved/closed。不是历史 SLA 达标率。超时判定为 evaluatedAt 严格晚于 deadline；等于截止时间不算超时。已完成的响应可显示历史超时，但不单独导致活跃超时计数。
+- UI 切换视图保留搜索、类型、优先级，清空状态与人员条件并回到第 1 页；统计点击同样切换视图。全量统计数不随这些筛选改变。筛选、视图、分页或刷新清空本页勾选；已解决/关闭工单不可勾选分派。
+
+## 批量分派
+
+```json
+{
+  "assigneeId": "person-demo-2",
+  "items": [{ "id": "opaque-id", "version": 1 }]
+}
+```
+
+- 一次 1–50 个不重复的 id（长度 1–200），每项 version 必须是正整数，目标处理人必须来自目录。请求整体先校验，任何结构/人员/重复/数量错误返回 422，整个请求不写入；模拟 503 也在写入前发生。
+- 校验通过后，按 items 顺序逐条比较当前版本、检查 open/in_progress，再写入处理人（可替换已有处理人）、updatedAt、version+1，并追加 assigned 活动。不会发送真实通知。
+- 200 `data = { succeeded: Ticket[], failed: {id,status,code,message,currentVersion?}[] }`。每个输入 id 恰好进入一组，组内保留输入相对顺序。失败项包括 NOT_FOUND/404、VERSION_CONFLICT/409、INVALID_STATE/409；已存在记录返回 currentVersion，缺失记录不返回。失败项不被本次请求修改；成功项保留，不回滚。
+- UI 提交前列出目标、数量和替换影响，提交中禁止关闭与重复触发；请求级失败保留选择和目标人员供手动重试。收到逐条结果后刷新队列、清空勾选并展示成功/失败原因。失败项须检查最新状态后重新选择，不自动重放过期版本。
+- 未来后端需保证每项版本比较与写入的原子性，并处理请求中断后的幂等/结果查询；当前 Mock 是同步内存实现，不能替代数据库并发事务。
 
 ## 工单状态机与时间
 

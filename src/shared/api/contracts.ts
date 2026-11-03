@@ -6,6 +6,10 @@ export type TicketStatus = (typeof statuses)[number];
 export const ticketTypes = ['incident', 'service_request'] as const;
 export type TicketType = (typeof ticketTypes)[number];
 export type Action = 'start' | 'resolve' | 'close' | 'reopen';
+export const ticketViews = ['all', 'active', 'unassigned', 'sla_breached', 'resolved'] as const;
+export type TicketView = (typeof ticketViews)[number];
+export const viewText: Record<TicketView, string> = { all: '全部工单', active: '活跃工单', unassigned: '待分派', sla_breached: 'SLA 超时', resolved: '已解决与关闭' };
+export const actionText: Record<Action, string> = { start: '开始处理', resolve: '解决工单', close: '关闭工单', reopen: '重新打开' };
 export interface Person {
   id: string;
   name: string;
@@ -61,6 +65,9 @@ export interface CreateTicket {
   serviceId?: string | null;
 }
 export interface TicketQuery {
+  view?: TicketView;
+  assigneeId?: string;
+  requesterId?: string;
   q?: string;
   status?: TicketStatus;
   priority?: Priority;
@@ -70,6 +77,7 @@ export interface TicketQuery {
   sort?: 'createdAt:desc' | 'createdAt:asc';
 }
 export interface TicketList {
+  evaluatedAt: string;
   items: Ticket[];
   total: number;
   page: number;
@@ -80,6 +88,14 @@ export interface TicketList {
     breached: number;
     resolved: number;
   };
+}
+export interface BulkAssignmentInput {
+  items: { id: string; version: number }[];
+  assigneeId: string;
+}
+export interface BulkAssignmentResult {
+  succeeded: Ticket[];
+  failed: { id: string; status: number; code: string; message: string; currentVersion?: number }[];
 }
 export interface Success<T> {
   data: T;

@@ -17,7 +17,7 @@ import { useCallback, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { api, errorText } from '../../shared/api/client';
 import type { Action, Ticket } from '../../shared/api/contracts';
-import { typeText } from '../../shared/api/contracts';
+import { actionText as actionNames, typeText } from '../../shared/api/contracts';
 import {
   dateTime,
   LoadState,
@@ -26,12 +26,6 @@ import {
   useResource,
 } from '../../shared/ui';
 
-const actionNames: Record<Action, string> = {
-  start: '开始处理',
-  resolve: '解决工单',
-  close: '关闭工单',
-  reopen: '重新打开',
-};
 function SlaResult({
   due,
   actual,

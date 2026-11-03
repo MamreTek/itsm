@@ -205,6 +205,80 @@ describe('v1 workflow contract', () => {
     await expect(api.list({ page: 0 })).rejects.toMatchObject({ status: 400 });
     await expect(api.detail('missing')).rejects.toMatchObject({ status: 404 });
   });
+  it('uses one SLA evaluation instant for queue views, people filters and global counts', async () => {
+    const all = await api.list();
+    expect(all.evaluatedAt).toBe('2026-11-03T12:00:00.000Z');
+    expect(all.summary).toEqual({ active: 4, unassigned: 3, breached: 2, resolved: 1 });
+    for (const [view, count] of [['active', 4], ['unassigned', 3], ['sla_breached', 2], ['resolved', 1]] as const) {
+      const list = await api.list({ view });
+      expect(list.total).toBe(count);
+      expect(list.summary).toEqual(all.summary);
+    }
+    const owned = await api.list({ view: 'active', assigneeId: 'person-demo-2', requesterId: 'person-demo-2' });
+    expect(owned.total).toBe(1);
+    expect(owned.items[0].title).toBe('测试环境磁盘容量告警');
+    expect((await api.list({ view: 'unassigned', assigneeId: 'person-demo-2' })).total).toBe(0);
+    for (const query of ['view=unknown', 'requesterId=missing', 'assigneeId=missing']) {
+      expect((await server.transport(new Request(`http://itsm.mock.local/api/v1/tickets?${query}`))).status).toBe(400);
+    }
+  });
+  it('excludes completed targets from active breaches and treats the exact deadline as on time', async () => {
+    let clock = now();
+    const timed = createClient(createMockServer({ delay: 0, now: () => clock }).transport);
+    let ticket = await timed.create(input);
+    clock += 240 * 60000;
+    expect((await timed.list({ view: 'sla_breached', q: input.title })).total).toBe(0);
+    clock += 1;
+    expect((await timed.list({ view: 'sla_breached', q: input.title })).total).toBe(1);
+    ticket = await timed.assign(ticket.id, 'person-demo-2', ticket.version);
+    ticket = await timed.transition(ticket.id, 'start', '已响应，继续解决', ticket.version);
+    expect((await timed.list({ view: 'sla_breached', q: input.title })).total).toBe(0);
+    clock = now() + 1440 * 60000 + 1;
+    ticket = await timed.transition(ticket.id, 'resolve', '超时解决', ticket.version);
+    expect((await timed.list({ view: 'sla_breached', q: input.title })).total).toBe(0);
+    await timed.transition(ticket.id, 'reopen', '需要继续跟进', ticket.version);
+    expect((await timed.list({ view: 'sla_breached', q: input.title })).total).toBe(1);
+  });
+  it('returns partial bulk outcomes without overwriting stale, resolved or missing tickets', async () => {
+    const first = await api.create(input);
+    const stale = await api.create(input);
+    const updated = await api.assign(stale.id, 'person-demo-3', stale.version);
+    const resolved = (await api.list({ view: 'resolved' })).items[0];
+    const result = await api.bulkAssign({ assigneeId: 'person-demo-2', items: [first, stale, resolved, { id: 'missing', version: 1 }].map(({ id, version }) => ({ id, version })) });
+    expect(result.succeeded).toHaveLength(1);
+    expect(result.succeeded[0]).toMatchObject({ id: first.id, assigneeId: 'person-demo-2', version: first.version + 1 });
+    expect(result.succeeded[0].activities.at(-1)?.message).toBe('批量分派给演示用户 B');
+    expect(result.failed).toEqual([
+      expect.objectContaining({ id: stale.id, status: 409, code: 'VERSION_CONFLICT', currentVersion: updated.version }),
+      expect.objectContaining({ id: resolved.id, status: 409, code: 'INVALID_STATE' }),
+      expect.objectContaining({ id: 'missing', status: 404, code: 'NOT_FOUND' }),
+    ]);
+    expect(await api.detail(stale.id)).toEqual(updated);
+    expect(await api.detail(resolved.id)).toEqual(resolved);
+    expect((await api.list({ view: 'unassigned' })).total).toBe(3);
+  });
+  it('validates the whole bulk request before any writes and preserves the selection on a simulated failure', async () => {
+    const ticket = await api.create(input);
+    const item = { id: ticket.id, version: ticket.version };
+    for (const body of [
+      { assigneeId: 'unknown', items: [item] },
+      { assigneeId: 'person-demo-2', items: [] },
+      { assigneeId: 'person-demo-2', items: [item, item] },
+      { assigneeId: 'person-demo-2', items: [item, null] },
+      { assigneeId: 'person-demo-2', items: [item, { id: 'other', version: 0 }] },
+      { assigneeId: 'person-demo-2', items: Array.from({ length: 51 }, (_, n) => ({ id: `id-${n}`, version: 1 })) },
+    ]) {
+      const response = await server.transport(new Request('http://itsm.mock.local/api/v1/tickets/bulk-assignment', { method: 'POST', body: JSON.stringify(body) }));
+      expect(response.status).toBe(422);
+      expect(await api.detail(ticket.id)).toEqual(ticket);
+    }
+    server.failNext();
+    await expect(api.bulkAssign({ assigneeId: 'person-demo-2', items: [item] })).rejects.toMatchObject({ status: 503 });
+    expect(await api.detail(ticket.id)).toEqual(ticket);
+    const retry = await api.bulkAssign({ assigneeId: 'person-demo-2', items: [item] });
+    expect(retry.succeeded[0].activities).toHaveLength(ticket.activities.length + 1);
+    expect(retry.failed).toEqual([]);
+  });
   it('returns public envelope/status/header semantics and handles malformed requests', async () => {
     const good = await server.transport(
       new Request('http://itsm.mock.local/api/v1/tickets', {

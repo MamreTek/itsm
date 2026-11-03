@@ -1,5 +1,7 @@
 import type {
   Action,
+  BulkAssignmentInput,
+  BulkAssignmentResult,
   CreateTicket,
   Failure,
   Person,
@@ -79,6 +81,7 @@ export function createClient(transport: Transport) {
         assigneeId,
         version,
       }),
+    bulkAssign: (input: BulkAssignmentInput) => request<BulkAssignmentResult>('/tickets/bulk-assignment', 'POST', input),
     transition: (id: string, action: Action, note: string, version: number) =>
       request<Ticket>(
         `/tickets/${encodeURIComponent(id)}/transitions`,

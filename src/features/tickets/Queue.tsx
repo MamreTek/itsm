@@ -1,4 +1,5 @@
 import {
+  Alert,
   Button,
   Card,
   Form,
@@ -7,6 +8,7 @@ import {
   Space,
   Statistic,
   Table,
+  Tabs,
   Tag,
 } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
@@ -19,8 +21,11 @@ import {
   statusText,
   ticketTypes,
   typeText,
+  ticketViews,
+  viewText,
 } from '../../shared/api/contracts';
-import type { TicketQuery } from '../../shared/api/contracts';
+import type { Ticket, TicketQuery, TicketView } from '../../shared/api/contracts';
+import { isActiveTicket } from '../../shared/api/sla';
 import {
   dateTime,
   LoadState,
@@ -29,6 +34,8 @@ import {
   useResource,
 } from '../../shared/ui';
 import { CreateTicket } from './CreateTicket';
+import { BulkAssignment } from './BulkAssignment';
+import { SlaCell } from './SlaCell';
 
 export function Queue() {
   const navigate = useNavigate();
@@ -39,12 +46,29 @@ export function Queue() {
   });
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
+  const [selected, setSelected] = useState<React.Key[]>([]);
+  const [assigning, setAssigning] = useState<Ticket[]>();
   const loader = useCallback(() => api.list(query), [query]);
   const resource = useResource(loader);
   const directory = useResource(api.directory);
-  const update = (patch: TicketQuery) =>
+  const update = (patch: TicketQuery) => {
+    setSelected([]);
     setQuery((q) => ({ ...q, ...patch, page: 1 }));
+  };
+  const refresh = () => {
+    setSelected([]);
+    resource.reload();
+    directory.reload();
+  };
+  const switchView = (view: TicketView) => update({ view, status: undefined, assigneeId: undefined, requesterId: undefined });
   const summary = resource.data?.summary;
+  const metrics: { title: string; value?: number; view: TicketView }[] = [
+    { title: '待处理与处理中', value: summary?.active, view: 'active' },
+    { title: '等待分派', value: summary?.unassigned, view: 'unassigned' },
+    { title: 'SLA 已超时', value: summary?.breached, view: 'sla_breached' },
+    { title: '已解决与关闭', value: summary?.resolved, view: 'resolved' },
+  ];
+  const peopleOptions = directory.data?.map(person => ({ value: person.id, label: `${person.name} · ${person.team}` }));
   return (
     <>
       <PageTitle
@@ -52,17 +76,14 @@ export function Queue() {
         description="查看、分派与处理故障事件和服务请求。"
       />
       <div className="metrics">
-        {[
-          ['待处理与处理中', summary?.active],
-          ['等待分派', summary?.unassigned],
-          ['SLA 已超时', summary?.breached],
-          ['已解决与关闭', summary?.resolved],
-        ].map(([title, value]) => (
-          <Card key={String(title)}>
+        {metrics.map(({ title, value, view }) => (
+          <Card key={view} className={query.view === view ? 'metric-selected' : ''}>
+            <button className="metric-button" aria-label={`查看${title}`} aria-pressed={query.view === view} onClick={() => switchView(view)}>
             <Statistic
               title={title}
               value={resource.loading || resource.error ? '—' : (value ?? '—')}
             />
+            </button>
           </Card>
         ))}
       </div>
@@ -132,10 +153,19 @@ export function Queue() {
               ]}
             />
           </Form.Item>
+          <Form.Item label="处理人" htmlFor="ticket-assignee">
+            <Select id="ticket-assignee" aria-label="筛选处理人" placeholder="全部处理人" value={query.assigneeId}
+              allowClear disabled={directory.loading || !!directory.error} options={peopleOptions} onChange={assigneeId => update({ assigneeId })} />
+          </Form.Item>
+          <Form.Item label="请求人" htmlFor="ticket-requester">
+            <Select id="ticket-requester" aria-label="筛选请求人" placeholder="全部请求人" value={query.requesterId}
+              allowClear disabled={directory.loading || !!directory.error} options={peopleOptions} onChange={requesterId => update({ requesterId })} />
+          </Form.Item>
           <Form.Item className="filter-actions">
             <Button
               onClick={() => {
                 setSearch('');
+                setSelected([]);
                 setQuery({ page: 1, pageSize: 10, sort: 'createdAt:desc' });
               }}
             >
@@ -149,13 +179,14 @@ export function Queue() {
         title="工单列表"
         extra={
           <>
+            <Button disabled={!selected.length || resource.loading || !!resource.error || directory.loading || !!directory.error}
+              onClick={() => setAssigning(resource.data?.items.filter(ticket => selected.includes(ticket.id)))}>
+              批量分派
+            </Button>
             <Button
               aria-label="刷新"
               icon={<ReloadOutlined aria-hidden />}
-              onClick={() => {
-                resource.reload();
-                directory.reload();
-              }}
+              onClick={refresh}
               loading={resource.loading}
             >
               刷新
@@ -171,6 +202,12 @@ export function Queue() {
           </>
         }
       >
+        <Tabs id="ticket-queue-views" activeKey={query.view ?? 'all'} onChange={view => switchView(view as TicketView)}
+          items={ticketViews.map(view => ({ key: view, label: viewText[view] }))} />
+        {!!selected.length && <Alert className="selection-notice" type="info" showIcon
+          title={`已选择本页 ${selected.length} 条工单`}
+          description="切换视图、筛选、分页或刷新后会清空选择。"
+          action={<Button type="link" onClick={() => setSelected([])}>清空选择</Button>} />}
         {directory.error && (
           <LoadState
             loading={false}
@@ -181,7 +218,7 @@ export function Queue() {
         <LoadState
           loading={resource.loading}
           error={resource.error}
-          retry={resource.reload}
+          retry={refresh}
           empty={!resource.data?.total}
         />
         {!resource.loading && !resource.error && !!resource.data?.total && (
@@ -189,16 +226,20 @@ export function Queue() {
             rowKey="id"
             size="middle"
             dataSource={resource.data.items}
-            scroll={{ x: 820 }}
+            scroll={{ x: 1215 }}
+            rowSelection={{ selectedRowKeys: selected, onChange: keys => setSelected(keys),
+              getCheckboxProps: ticket => ({ disabled: !isActiveTicket(ticket), 'aria-label': `选择 ${ticket.number}` }) }}
             pagination={{
               current: query.page,
               pageSize: query.pageSize,
               total: resource.data.total,
-              showSizeChanger: true,
+              showSizeChanger: { id: 'ticket-page-size', 'aria-label': '每页条数' },
               pageSizeOptions: [5, 10, 20],
               showTotal: (total) => `共 ${total} 条`,
-              onChange: (page, pageSize) =>
-                setQuery((q) => ({ ...q, page, pageSize })),
+              onChange: (page, pageSize) => {
+                setSelected([]);
+                setQuery((q) => ({ ...q, page: pageSize === q.pageSize ? page : 1, pageSize }));
+              },
             }}
             columns={[
               {
@@ -240,6 +281,18 @@ export function Queue() {
                   (t.assigneeId ? '目录加载中' : '未分派'),
               },
               {
+                title: '请求人',
+                key: 'requester',
+                width: 130,
+                render: (_, t) => directory.data?.find(person => person.id === t.requesterId)?.name ?? '目录加载中',
+              },
+              {
+                title: 'SLA 目标（UTC）',
+                key: 'sla',
+                width: 210,
+                render: (_, t) => <SlaCell ticket={t} at={resource.data!.evaluatedAt} />,
+              },
+              {
                 title: '创建时间（UTC）',
                 dataIndex: 'createdAt',
                 width: 165,
@@ -250,7 +303,7 @@ export function Queue() {
         )}
       </Card>
       <p className="muted footnote">
-        统计基于全部模拟工单，与队列筛选无关。刷新浏览器后数据重置。
+        统计基于全部模拟工单，与队列筛选无关。超时视图只包含尚未履约的活跃工单目标。SLA 评估于 {dateTime(resource.data?.evaluatedAt ?? null)} UTC，刷新队列可重新评估。刷新浏览器后数据重置。
       </p>
       {creating && (
         <CreateTicket
@@ -261,6 +314,7 @@ export function Queue() {
           }}
         />
       )}
+      {assigning && <BulkAssignment tickets={assigning} people={directory.data ?? []} onClose={() => setAssigning(undefined)} onSettled={refresh} />}
     </>
   );
 }

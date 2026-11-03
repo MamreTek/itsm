@@ -1,12 +1,16 @@
-import { priorities, statuses, ticketTypes } from '../shared/api/contracts';
+import { actionText, priorities, statuses, ticketTypes, ticketViews } from '../shared/api/contracts';
+import { assessSla, isActiveTicket, matchesView } from '../shared/api/sla';
 import { createId } from '../shared/api/id';
 import type {
   Activity,
+  BulkAssignmentInput,
+  BulkAssignmentResult,
   CreateTicket,
   Failure,
   SlaPolicy,
   Ticket,
   TicketStatus,
+  TicketView,
   Transport,
 } from '../shared/api/contracts';
 import {
@@ -131,6 +135,19 @@ export function createMockServer({
     rows[4].activities.push(activity('status', '已解决：已提供演示操作说明'));
   };
   reset();
+  const assignTicket = (id: string, assigneeId: unknown, version: unknown, bulk = false): Ticket => {
+    const ticket = rows.find(row => row.id === id);
+    if (!ticket) return fail(404, 'NOT_FOUND', '工单不存在');
+    if (!Number.isInteger(version) || version !== ticket.version) return fail(409, 'VERSION_CONFLICT', '工单已变更，请刷新后重试');
+    if (!isActiveTicket(ticket)) return fail(409, 'INVALID_STATE', '只有待处理和处理中工单可分派');
+    const person = people.find(item => item.id === assigneeId);
+    if (!person) return fail(422, 'VALIDATION_ERROR', '请选择有效处理人');
+    ticket.assigneeId = person.id;
+    ticket.activities.push(activity('assigned', `${bulk ? '批量分派给' : '分派给'}${person.name}`));
+    ticket.version += 1;
+    ticket.updatedAt = timestamp();
+    return ticket;
+  };
   const transport: Transport = async (request) => {
     if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
     const requestId = `mock-${createId()}`;
@@ -166,6 +183,21 @@ export function createMockServer({
       if (path === '/api/v1/directory' && method === 'GET') return json(people);
       if (path === '/api/v1/sla-policies' && method === 'GET')
         return json(policies);
+      if (path === '/api/v1/tickets/bulk-assignment' && method === 'POST') {
+        if (!people.some(person => person.id === body.assigneeId)) fail(422, 'VALIDATION_ERROR', '请选择有效处理人', { assigneeId: '处理人不存在' });
+        if (!Array.isArray(body.items) || body.items.length < 1 || body.items.length > 50) fail(422, 'VALIDATION_ERROR', '每次请选择 1–50 个工单');
+        const items = body.items as BulkAssignmentInput['items'];
+        if (!items.every(item => item && typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200 && Number.isInteger(item.version) && item.version > 0) || new Set(items.map(item => item.id)).size !== items.length) fail(422, 'VALIDATION_ERROR', '目标必须包含有效 id 和版本，且不能重复');
+        const result: BulkAssignmentResult = { succeeded: [], failed: [] };
+        for (const item of items) {
+          try { result.succeeded.push(assignTicket(item.id, body.assigneeId, item.version, true)); }
+          catch (error) {
+            if (!(error instanceof Problem)) throw error;
+            result.failed.push({ id: item.id, status: error.status, code: error.code, message: error.message, currentVersion: rows.find(row => row.id === item.id)?.version });
+          }
+        }
+        return json(result);
+      }
       const policyMatch = path.match(/^\/api\/v1\/sla-policies\/(P[1-4])$/);
       if (policyMatch && method === 'PUT') {
         const policy = policies.find((p) => p.priority === policyMatch[1])!;
@@ -194,6 +226,10 @@ export function createMockServer({
       }
       if (path === '/api/v1/tickets' && method === 'GET') {
         const p = url.searchParams;
+        const evaluatedAt = now();
+        const view = p.get('view') || 'all';
+        if (!(ticketViews as readonly string[]).includes(view)) fail(400, 'INVALID_QUERY', '无效视图');
+        for (const key of ['assigneeId', 'requesterId']) if (p.has(key) && !people.some(person => person.id === p.get(key))) fail(400, 'INVALID_QUERY', `无效 ${key}`);
         const integer = (key: string, fallback: number, max: number) => {
           const raw = p.get(key);
           const value = raw === null ? fallback : Number(raw);
@@ -223,7 +259,10 @@ export function createMockServer({
           .filter(
             (t) =>
               `${t.number} ${t.title}`.toLowerCase().includes(q) &&
-              filters.every(([key]) => !p.has(key) || t[key] === p.get(key)),
+              filters.every(([key]) => !p.has(key) || t[key] === p.get(key)) &&
+              matchesView(t, view as TicketView, evaluatedAt) &&
+              (!p.has('assigneeId') || t.assigneeId === p.get('assigneeId')) &&
+              (!p.has('requesterId') || t.requesterId === p.get('requesterId')),
           )
           .sort(
             (a, b) =>
@@ -231,15 +270,10 @@ export function createMockServer({
                 (sort === 'createdAt:asc' ? 1 : -1) ||
               a.number.localeCompare(b.number),
           );
-        const active = rows.filter((t) =>
-          ['open', 'in_progress'].includes(t.status),
-        );
-        const breached = active.filter(
-          (t) =>
-            (!t.firstRespondedAt && now() > Date.parse(t.sla.responseDueAt)) ||
-            now() > Date.parse(t.sla.resolutionDueAt),
-        ).length;
+        const active = rows.filter(isActiveTicket);
+        const breached = active.filter(t => assessSla(t, evaluatedAt).activeBreach).length;
         return json({
+          evaluatedAt: new Date(evaluatedAt).toISOString(),
           items: filtered.slice((page - 1) * pageSize, page * pageSize),
           total: filtered.length,
           page,
@@ -295,12 +329,7 @@ export function createMockServer({
         if (ticket.status === 'closed')
           fail(409, 'INVALID_STATE', '已关闭工单不能修改');
         if (match[2] === 'assignment') {
-          if (!['open', 'in_progress'].includes(ticket.status))
-            fail(409, 'INVALID_STATE', '只有待处理和处理中工单可分派');
-          const person = people.find((p) => p.id === body.assigneeId);
-          if (!person) fail(422, 'VALIDATION_ERROR', '请选择有效处理人');
-          ticket.assigneeId = person!.id;
-          ticket.activities.push(activity('assigned', `分派给${person!.name}`));
+          return json(assignTicket(ticket.id, body.assigneeId, body.version));
         } else if (match[2] === 'comments') {
           const note = text(body.message, 1, 2000, 'message');
           ticket.activities.push(activity('comment', note));
@@ -326,7 +355,7 @@ export function createMockServer({
           if (body.action === 'resolve') ticket.resolvedAt = timestamp();
           if (body.action === 'close') ticket.closedAt = timestamp();
           if (body.action === 'reopen') ticket.resolvedAt = null;
-          ticket.activities.push(activity('status', `${body.action}：${note}`));
+          ticket.activities.push(activity('status', `${actionText[body.action as keyof typeof actionText]}：${note}`));
         }
         ticket.version += 1;
         ticket.updatedAt = timestamp();
