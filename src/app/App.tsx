@@ -159,7 +159,7 @@ function Shell() {
             <span>
               <ExperimentOutlined /> 演示工具
             </span>
-            <Space wrap>
+            <Space wrap role="group" aria-label="模拟数据操作">
               <Button
                 size="small"
                 onClick={() => {

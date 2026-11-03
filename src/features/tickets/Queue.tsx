@@ -88,7 +88,7 @@ export function Queue() {
         ))}
       </div>
       <Card className="query-card">
-        <Form layout="inline" className="filters">
+        <Form aria-label="工单查询" layout="inline" className="filters">
           <Form.Item label="工单名称" htmlFor="ticket-search">
             <Input.Search
               id="ticket-search"
@@ -178,7 +178,7 @@ export function Queue() {
         className="queue-card"
         title="工单列表"
         extra={
-          <>
+          <Space role="toolbar" aria-label="工单操作">
             <Button disabled={!selected.length || resource.loading || !!resource.error || directory.loading || !!directory.error}
               onClick={() => setAssigning(resource.data?.items.filter(ticket => selected.includes(ticket.id)))}>
               批量分派
@@ -199,7 +199,7 @@ export function Queue() {
             >
               新建工单
             </Button>
-          </>
+          </Space>
         }
       >
         <Tabs id="ticket-queue-views" activeKey={query.view ?? 'all'} onChange={view => switchView(view as TicketView)}
