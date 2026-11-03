@@ -13,7 +13,8 @@ it('shows the prototype boundary, searches an empty queue and recovers from a fa
   render(<App />);
   expect(screen.getByText('产品原型 / 模拟数据')).toBeInTheDocument();
   await screen.findByText('演示应用响应变慢');
-  await user.type(screen.getByLabelText('搜索工单'), '没有此工单');
+  await user.click(screen.getByLabelText('搜索工单'));
+  await user.paste('没有此工单');
   await user.click(screen.getByRole('button', { name: '搜索' }));
   await screen.findByText('没有符合条件的记录，试试调整筛选或新建工单');
   await user.click(screen.getByRole('button', { name: '重置筛选' }));
@@ -37,14 +38,10 @@ it('validates a create form, keeps the draft on failure, and creates exactly one
   );
   await user.click(within(dialog).getByRole('button', { name: '提交工单' }));
   await within(dialog).findByText('请输入 4–120 个字符的标题');
-  await user.type(
-    within(dialog).getByLabelText('工单标题'),
-    '新增演示故障流程',
-  );
-  await user.type(
-    within(dialog).getByLabelText('需求或故障描述'),
-    '这是用于验证提交失败后草稿保留的虚构描述。',
-  );
+  await user.click(within(dialog).getByLabelText('工单标题'));
+  await user.paste('新增演示故障流程');
+  await user.click(within(dialog).getByLabelText('需求或故障描述'));
+  await user.paste('这是用于验证提交失败后草稿保留的虚构描述。');
   await user.click(within(dialog).getByLabelText('请求人（虚构目录）'));
   await user.click(await screen.findByText('演示用户 A · 业务应用组'));
   mock.failNext();

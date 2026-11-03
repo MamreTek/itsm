@@ -43,9 +43,8 @@ export function Policies() {
   return (
     <>
       <PageTitle
-        eyebrow="SERVICE LEVEL TARGETS"
         title="SLA 策略"
-        description="从四个清晰的服务目标开始，减少复杂配置。"
+        description="按优先级配置首次响应与解决时限，已创建工单保留原策略快照。"
         action={<Button onClick={resource.reload}>刷新策略</Button>}
       />
       <Alert

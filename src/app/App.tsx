@@ -1,8 +1,11 @@
 import {
   App as AntApp,
   Alert,
+  Breadcrumb,
   Button,
   ConfigProvider,
+  Drawer,
+  Grid,
   Layout,
   Menu,
   Modal,
@@ -15,6 +18,9 @@ import {
   AuditOutlined,
   ExperimentOutlined,
   InboxOutlined,
+  DeploymentUnitOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
 import {
@@ -40,6 +46,19 @@ function Shell() {
   const [revision, setRevision] = useState(0);
   const { message } = AntApp.useApp();
   const [showReset, setShowReset] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [navigationOpen, setNavigationOpen] = useState(false);
+  const screens = Grid.useBreakpoint();
+  const isMobile = screens.md === false;
+  const activeKey = location.pathname.startsWith('/tickets')
+    ? '/tickets'
+    : location.pathname;
+  const pageLabel =
+    activeKey === '/catalog'
+      ? '服务目录'
+      : activeKey === '/sla'
+        ? 'SLA 策略'
+        : '工单队列';
   const items = [
     {
       key: '/tickets',
@@ -58,40 +77,58 @@ function Shell() {
     },
   ];
   return (
-    <Layout className="shell">
+    <Layout className={`shell${collapsed ? ' is-collapsed' : ''}`}>
       <header className="topbar">
         <Link className="brand" to="/tickets">
-          <span className="brand-mark">m.</span>
-          <span>
-            MamreTek <strong>ITSM</strong>
-          </span>
+          <DeploymentUnitOutlined className="brand-icon" aria-hidden />
+          <span>MamreTek ITSM</span>
         </Link>
-        <Space>
+        <Button
+          type="text"
+          className="navigation-toggle"
+          aria-label={isMobile || collapsed ? '展开导航' : '收起导航'}
+          icon={
+            isMobile || collapsed ? (
+              <MenuUnfoldOutlined aria-hidden />
+            ) : (
+              <MenuFoldOutlined aria-hidden />
+            )
+          }
+          onClick={() =>
+            isMobile ? setNavigationOpen(true) : setCollapsed((value) => !value)
+          }
+        />
+        <span className="header-section">IT 服务管理</span>
+        <Space className="header-context">
           <Tag color="gold" icon={<ExperimentOutlined />}>
             产品原型
           </Tag>
-          <span className="topbar-caption">让服务流动起来</span>
+          <span className="topbar-caption">Mock 工作空间</span>
         </Space>
       </header>
       <div className="workspace">
-        <aside className="sidebar">
-          <div className="sidebar-label">服务管理</div>
-          <Menu
-            mode="inline"
-            selectedKeys={[
-              location.pathname.startsWith('/tickets')
-                ? '/tickets'
-                : location.pathname,
-            ]}
-            items={items}
-          />
-          <div className="sidebar-footer">
-            <span className="status-dot" /> Mock 工作空间
-            <br />
-            <span className="muted">独立可用 · 组合更强</span>
-          </div>
-        </aside>
+        {!isMobile && (
+          <aside className="sidebar">
+            <div className="sidebar-label">服务管理</div>
+            <Menu
+              mode="inline"
+              selectedKeys={[activeKey]}
+              inlineCollapsed={collapsed}
+              items={items}
+            />
+          </aside>
+        )}
         <main className="main">
+          <Breadcrumb
+            className="page-breadcrumb"
+            items={[
+              { title: '服务管理' },
+              { title: pageLabel },
+              ...(location.pathname.startsWith('/tickets/')
+                ? [{ title: '工单详情' }]
+                : []),
+            ]}
+          />
           <Alert
             className="prototype-banner"
             type="warning"
@@ -136,6 +173,20 @@ function Shell() {
           </footer>
         </main>
       </div>
+      <Drawer
+        title="IT 服务管理"
+        placement="left"
+        size={240}
+        open={isMobile && navigationOpen}
+        onClose={() => setNavigationOpen(false)}
+      >
+        <Menu
+          mode="inline"
+          selectedKeys={[activeKey]}
+          items={items}
+          onClick={() => setNavigationOpen(false)}
+        />
+      </Drawer>
       <Modal
         title="重置所有模拟数据？"
         open={showReset}
@@ -163,17 +214,18 @@ export default function App() {
       button={{ autoInsertSpace: false }}
       theme={{
         token: {
-          colorPrimary: '#247462',
-          borderRadius: 10,
+          colorPrimary: '#1677ff',
+          borderRadius: 6,
           fontFamily:
-            'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif',
-          colorBgLayout: '#f4f6f5',
-          colorBorderSecondary: '#e8edeb',
+            '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
+          fontSize: 14,
+          controlHeight: 32,
+          colorBgLayout: '#f5f5f5',
+          colorBorderSecondary: '#f0f0f0',
         },
         components: {
-          Button: { controlHeight: 36 },
-          Card: { headerFontSize: 15 },
-          Menu: { itemSelectedBg: '#e5f0eb', itemSelectedColor: '#185e4e' },
+          Card: { headerFontSize: 16, headerHeight: 56 },
+          Table: { cellPaddingBlockMD: 12, cellPaddingInlineMD: 16 },
         },
       }}
     >

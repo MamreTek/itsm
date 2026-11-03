@@ -105,9 +105,9 @@ export function Detail() {
         <ArrowLeftOutlined /> 返回工单队列
       </Link>
       <PageTitle
-        eyebrow={ticket?.number ?? 'TICKET DETAIL'}
+        meta={ticket?.number}
         title={ticket?.title ?? '工单详情'}
-        description="每一步处理都记录在这里。时间使用 UTC。"
+        description="查看工单信息、处理记录与 SLA 目标。时间使用 UTC。"
         action={
           <Button
             icon={<ReloadOutlined />}

@@ -74,24 +74,26 @@ export function StatusTag({ status }: { status: TicketStatus }) {
   return <Tag color={colors[status]}>{statusText[status]}</Tag>;
 }
 export function PageTitle({
-  eyebrow,
   title,
   description,
   action,
+  meta,
 }: {
-  eyebrow: string;
   title: string;
   description: string;
   action?: React.ReactNode;
+  meta?: React.ReactNode;
 }) {
   return (
     <div className="page-title">
       <div>
-        <div className="eyebrow">{eyebrow}</div>
-        <h1>{title}</h1>
+        <Space wrap>
+          <h1>{title}</h1>
+          {meta && <span className="page-meta">{meta}</span>}
+        </Space>
         <p>{description}</p>
       </div>
-      <Space wrap>{action}</Space>
+      {action && <Space wrap>{action}</Space>}
     </div>
   );
 }

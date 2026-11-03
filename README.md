@@ -55,6 +55,7 @@ npm run preview:local
 - `src/shared/api/contracts.ts`：后端可适配的类型；`client.ts`：统一客户端。
 - `src/mocks`：独立 Fetch-compatible Mock transport、虚构数据、HTTP 语义校验。
 - [API 契约](docs/api-contract.md)：方法、路径、类型、校验、分页、状态转换和错误。
+- [UI 参考与调整](docs/ui-reference.md)：Ant Design Pro 风格依据、对比与访问限制。
 - [架构与后端交接](docs/architecture.md)、[验证记录](docs/verification.md)、[工程规范 1.2 快照](docs/development-conventions.md)。
 
 当前仅注入 Mock transport，不会发出 API 网络请求，也没有隐含的真实服务地址开关。后端确定后在适配层替换 transport，并补充真实认证、权限和安全验收；页面继续使用统一客户端和 v1 契约。服务申请不会真正创建云资源、签发证书或授予权限。

@@ -6,6 +6,7 @@ export default defineConfig({
   outputDir: 'artifacts/playwright',
   timeout: 45000,
   reporter: 'list',
+  workers: 1,
   use: {
     channel: 'chromium',
     baseURL: 'http://127.0.0.1:5186',

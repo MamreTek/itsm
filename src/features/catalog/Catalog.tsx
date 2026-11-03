@@ -24,19 +24,9 @@ export function Catalog() {
   return (
     <>
       <PageTitle
-        eyebrow="SERVICE CATALOG"
-        title="需要什么帮助？"
-        description="从常用服务开始，把需求交给合适的人。"
+        title="服务目录"
+        description="选择服务并提交申请，申请将进入工单队列。"
       />
-      <div className="catalog-hero">
-        <Tag color="cyan">轻量服务台</Tag>
-        <h2>
-          一次清晰的申请，
-          <br />
-          是高效协作的开始。
-        </h2>
-        <p>选择服务、说明用途、跟进结果。先把流程跑通。</p>
-      </div>
       <LoadState
         loading={resource.loading}
         error={resource.error}
@@ -47,9 +37,11 @@ export function Catalog() {
         <div className="catalog-grid">
           {resource.data?.map((item, i) => (
             <Card key={item.id} className="service-card">
-              <div className="service-icon">{icons[i % icons.length]}</div>
+              <div className="service-heading">
+                <span className="service-icon">{icons[i % icons.length]}</span>
+                <h2>{item.name}</h2>
+              </div>
               <Tag>{item.category}</Tag>
-              <h2>{item.name}</h2>
               <p className="muted">{item.description}</p>
               <Button type="link" onClick={() => setService(item)}>
                 申请服务 <ArrowRightOutlined />

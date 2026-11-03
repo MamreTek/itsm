@@ -1,4 +1,12 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+async function openMenu(page: Page, name: string) {
+  const link = page.getByRole('link', { name, exact: true });
+  if (!(await link.isVisible()))
+    await page.getByRole('button', { name: '展开导航', exact: true }).click();
+  await page.getByRole('link', { name, exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'IT 服务管理' })).toBeHidden();
+}
 
 test('catalog request completes the service desk workflow with retry and no page overflow', async ({
   page,
@@ -21,7 +29,7 @@ test('catalog request completes the service desk workflow with retry and no page
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page.getByRole('link', { name: '服务目录', exact: true }).click();
+  await openMenu(page, '服务目录');
   await page.getByRole('button', { name: '申请服务' }).first().click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('工单标题').fill('完整流程演示申请');
@@ -108,7 +116,7 @@ test('SLA validation, policy save, reset confirmation and empty queue work', asy
   await dialog.getByLabel('解决时限（分钟）').fill('120');
   await dialog.getByRole('button', { name: '保存策略' }).click();
   await expect(page.getByText('120 分钟', { exact: true })).toBeVisible();
-  await page.getByRole('link', { name: '工单队列', exact: true }).click();
+  await openMenu(page, '工单队列');
   await page.getByLabel('搜索工单').fill('不存在的演示记录');
   await page.getByRole('button', { name: '搜索', exact: true }).click();
   await expect(
