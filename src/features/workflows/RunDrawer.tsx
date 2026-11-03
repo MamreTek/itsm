@@ -42,7 +42,7 @@ export function RunDrawer({ workflow, existing, people, onClose, onRun }: {
   }
   return <Drawer title="流程模拟（Mock）" size={1000} open onClose={onClose} closable={!busy} mask={{ closable: !busy }} keyboard={!busy}>
     <Alert className="policy-note" type="info" showIcon title="仅模拟串行与条件分支，不执行真实审批或任务"
-      description="运行冻结已保存版本；关闭面板保留本页的最近实例。刷新浏览器会清空全部模拟记录。" />
+      description="运行冻结已保存版本；关闭面板或切换模块会保留本页的最近实例。刷新浏览器会清空全部模拟记录。" />
     {error && <Alert className="form-error" type="error" showIcon title="模拟请求失败" description={error} />}
     {!run ? <Form form={form} layout="vertical" initialValues={{ priority: 'P1', type: 'service_request' }} disabled={busy}
       onFinish={inputs => void work(() => api.createRun(workflow.id, workflow.version, inputs))}>

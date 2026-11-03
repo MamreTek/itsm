@@ -5,10 +5,12 @@ import { api, errorText } from '../../shared/api/client';
 import { createId } from '../../shared/api/id';
 import { priorities, ticketTypes, typeText } from '../../shared/api/contracts';
 import { nodeKinds, nodeText, portsFor, portText } from '../../shared/api/workflows';
-import type { FlowNode, FlowValidation, NodeKind, Port, Workflow, WorkflowDraft, WorkflowRun } from '../../shared/api/workflows';
+import type { FlowNode, NodeKind, Port, Workflow, WorkflowDraft, WorkflowRun } from '../../shared/api/workflows';
 import { LoadState, PageTitle, useResource } from '../../shared/ui';
 import { FlowCanvas } from './FlowCanvas';
 import { RunDrawer } from './RunDrawer';
+import { useWorkflowSession } from './WorkflowSession';
+import type { WorkflowSessionState } from './WorkflowSession';
 
 const draftOf = ({ name, description, graph }: Workflow): WorkflowDraft => structuredClone({ name, description, graph });
 function freePosition(nodes: FlowNode[]) {
@@ -19,54 +21,41 @@ export function Designer() {
   const resource = useResource(api.workflows);
   const directory = useResource(api.directory);
   const { modal, message } = App.useApp();
-  const [saved, setSaved] = useState<Workflow>();
-  const [draft, setDraft] = useState<WorkflowDraft>();
-  const [dirty, setDirty] = useState(false);
-  const [selectedId, setSelectedId] = useState('start');
-  const [targetId, setTargetId] = useState<string>();
-  const [port, setPort] = useState<Port>('next');
-  const [validation, setValidation] = useState<FlowValidation>();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
+  const [{ saved, draft, dirty, selectedId, targetId, port, validation, busy, error, lastRun }, setSession] = useWorkflowSession();
+  const patchSession = (patch: Partial<WorkflowSessionState>) => setSession(value => ({ ...value, ...patch }));
+  const setSelectedId = (id: string) => patchSession({ selectedId: id });
+  const setTargetId = (id?: string) => patchSession({ targetId: id });
+  const setPort = (value: Port) => patchSession({ port: value });
+  const setLastRun = (value: WorkflowRun) => patchSession({ lastRun: value });
   const [showRun, setShowRun] = useState(false);
   const [resume, setResume] = useState(false);
-  const [lastRun, setLastRun] = useState<WorkflowRun>();
   useEffect(() => {
-    if (!saved && resource.data?.[0]) {
-      setSaved(resource.data[0]);
-      setDraft(draftOf(resource.data[0]));
-      setValidation(resource.data[0].validation);
+    const initial = resource.data?.[0];
+    if (!saved && initial) {
+      setSession(value => value.saved ? value : {
+        ...value, saved: initial, draft: draftOf(initial), validation: initial.validation,
+        selectedId: initial.graph.nodes[0]?.id ?? '',
+      });
     }
-  }, [resource.data, saved]);
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty]);
+  }, [resource.data, saved, setSession]);
   const selected = draft?.graph.nodes.find(node => node.id === selectedId);
   const availablePorts = selected ? portsFor[selected.kind] : [];
   const effectivePort = availablePorts.includes(port) ? port : availablePorts[0];
   const options = draft?.graph.nodes.map(node => ({ value: node.id, label: `${node.label || '未命名'} · ${nodeText[node.kind]}` }));
   const accept = (workflow: Workflow) => {
-    setSaved(workflow);
-    setDraft(draftOf(workflow));
-    setValidation(workflow.validation);
-    setSelectedId(workflow.graph.nodes[0]?.id ?? '');
-    setTargetId(undefined);
-    setDirty(false);
+    patchSession({ saved: workflow, draft: draftOf(workflow), validation: workflow.validation,
+      selectedId: workflow.graph.nodes[0]?.id ?? '', targetId: undefined, dirty: false });
     resource.reload();
   };
-  const edit = (value: WorkflowDraft) => { setDraft(value); setDirty(true); setValidation(undefined); };
+  const edit = (value: WorkflowDraft) => patchSession({ draft: value, dirty: true, validation: undefined });
   const editNode = (patch: Partial<FlowNode>) => {
     if (draft && selected) edit({ ...draft, graph: { ...draft.graph, nodes: draft.graph.nodes.map(node => node.id === selected.id ? { ...node, ...patch } : node) } });
   };
   async function work(action: () => Promise<void>) {
     if (busy) return;
-    setBusy(true);
-    setError(undefined);
-    try { await action(); } catch (cause) { setError(errorText(cause)); }
-    finally { setBusy(false); }
+    patchSession({ busy: true, error: undefined });
+    try { await action(); } catch (cause) { patchSession({ error: errorText(cause) }); }
+    finally { patchSession({ busy: false }); }
   }
   const discardThen = (action: () => void) => dirty
     ? modal.confirm({ title: '放弃未保存的流程改动？', content: '当前改动尚未保存，切换后将丢失。已保存版本和已开始的模拟不受影响。', okText: '放弃改动', cancelText: '继续编辑', onOk: action })
@@ -114,7 +103,7 @@ export function Designer() {
             options={[...(resource.data ?? []).filter(item => item.id !== saved.id), saved].map(item => ({ value: item.id, label: item.name || '未命名流程' }))} />
           <Button icon={<PlusOutlined aria-hidden />} disabled={busy} onClick={create}>新建流程</Button>
           <Button icon={<ReloadOutlined aria-hidden />} disabled={busy} onClick={() => load(saved.id)}>读取已保存版本</Button>
-          <Button disabled={busy} onClick={() => void work(async () => { setValidation(await api.validateWorkflow(draft)); })}>校验流程</Button>
+          <Button disabled={busy} onClick={() => void work(async () => { patchSession({ validation: await api.validateWorkflow(draft) }); })}>校验流程</Button>
           <Button type="primary" icon={<SaveOutlined aria-hidden />} loading={busy} onClick={() => void work(async () => { accept(await api.saveWorkflow(saved.id, draft, saved.version)); message.success('流程草稿已保存'); })}>保存草稿</Button>
           <Button disabled={busy || dirty || !saved.validation.valid} onClick={() => { setResume(false); setShowRun(true); }}>模拟运行</Button>
           {lastRun && <Button disabled={busy} onClick={() => { setResume(true); setShowRun(true); }}>查看上次模拟</Button>}
@@ -123,7 +112,7 @@ export function Designer() {
           <Form.Item label="流程名称" htmlFor="workflow-name"><Input id="workflow-name" value={draft.name} maxLength={80} onChange={event => edit({ ...draft, name: event.target.value })} /></Form.Item>
           <Form.Item label="流程说明" htmlFor="workflow-description"><Input id="workflow-description" value={draft.description} maxLength={1000} onChange={event => edit({ ...draft, description: event.target.value })} /></Form.Item>
         </Form>
-        <p className="muted">点击节点编辑属性，拖动或聚焦后用方向键移动。草稿允许暂存不完整配置；只有通过校验的已保存版本可模拟。离开本模块前请保存。</p>
+        <p className="muted">点击节点编辑属性，拖动或聚焦后用方向键移动。切换模块保留本页未保存草稿，刷新仍会重置；只有通过校验的已保存版本可模拟。</p>
       </Card>
       {validation && <Alert className="policy-note" showIcon type={validation.valid ? 'success' : 'warning'} title={validation.valid ? '流程校验通过' : `流程存在 ${validation.issues.length} 个问题`}
         description={!validation.valid && <ul className="flow-issues">{validation.issues.map((issue, index) => <li key={`${issue.code}-${index}`}>

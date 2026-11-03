@@ -1,4 +1,11 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+async function openModule(page: Page, name: string) {
+  const link = page.getByRole('link', { name, exact: true });
+  if (!(await link.isVisible())) await page.getByRole('button', { name: '展开导航', exact: true }).click();
+  await link.click();
+  await expect(page.getByRole('dialog', { name: 'IT 服务管理', exact: true })).toBeHidden();
+}
 
 test('visual editor creates nodes and connections, validates, saves with retry and runs a task', async ({ page }, info) => {
   const errors: string[] = [];
@@ -105,4 +112,44 @@ test('simulation follows approval and rejection exits and preserves a frozen ver
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect(errors).toEqual([]);
   expect(requests).toEqual([]);
+});
+
+test('workflow session retains its draft and pending run across modules, and reset clears both', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/#/workflows');
+  await page.getByRole('button', { name: '模拟运行', exact: true }).click();
+  const drawer = page.getByRole('dialog', { name: '流程模拟（Mock）', exact: true });
+  await drawer.getByRole('button', { name: '启动模拟', exact: true }).click();
+  await drawer.getByLabel('模拟操作说明', { exact: true }).fill('跨模块前模拟审批通过');
+  await drawer.getByRole('button', { name: '模拟通过', exact: true }).click();
+  await expect(drawer.getByText('当前节点：紧急请求处理', { exact: true })).toBeVisible();
+  await drawer.getByRole('button', { name: '关闭', exact: true }).click();
+  await page.getByLabel('流程名称', { exact: true }).fill('跨模块保留的流程草稿');
+  await page.getByRole('button', { name: '条件分支节点：是否为 P1？', exact: true }).click();
+  await page.getByLabel('节点名称', { exact: true }).fill('保留的条件配置');
+  await openModule(page, '工单队列');
+  await expect(page.getByText('演示应用响应变慢', { exact: true })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByLabel('流程名称', { exact: true })).toHaveValue('跨模块保留的流程草稿');
+  await expect(page.getByText('有未保存改动', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('节点名称', { exact: true })).toHaveValue('保留的条件配置');
+  await page.getByRole('button', { name: '查看上次模拟', exact: true }).click();
+  await expect(drawer.getByText('服务申请分流 · v1', { exact: true })).toBeVisible();
+  await expect(drawer.getByText('当前节点：紧急请求处理', { exact: true })).toBeVisible();
+  await drawer.getByLabel('模拟操作说明', { exact: true }).fill('返回后继续完成模拟');
+  await drawer.getByRole('button', { name: '模拟处理完成', exact: true }).click();
+  await expect(drawer.getByText('模拟流程已完成', { exact: true })).toBeVisible();
+  await drawer.getByRole('button', { name: '关闭', exact: true }).click();
+  await page.getByRole('button', { name: '读取已保存版本', exact: true }).click();
+  await page.getByRole('button', { name: '继续编辑', exact: true }).click();
+  await expect(page.getByLabel('流程名称', { exact: true })).toHaveValue('跨模块保留的流程草稿');
+  await page.getByRole('button', { name: '重置模拟数据', exact: false }).click();
+  await page.getByRole('button', { name: '确认重置', exact: true }).click();
+  await expect(page.getByText('演示应用响应变慢', { exact: true })).toBeVisible();
+  await openModule(page, '流程中心');
+  await expect(page.getByLabel('流程名称', { exact: true })).toHaveValue('服务申请分流');
+  await expect(page.getByRole('button', { name: '查看上次模拟', exact: true })).toHaveCount(0);
+  await expect(page.getByText('有未保存改动', { exact: true })).toHaveCount(0);
+  expect(errors).toEqual([]);
 });

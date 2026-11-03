@@ -51,7 +51,7 @@ Edge：id、source、target 均为非空 ≤80 字字符串；port 只允许下�
 
 name 至少 2 字、节点名称非空、ID 唯一、每个所需出口恰好一条连线、端点存在、无自连/环、所有节点从开始可达且可到达结束，均为语义校验。语义未完成的草稿**允许保存**，响应 `validation.valid=false`；不允许启动模拟。校验响应为 `{valid,issues:[{code,message,nodeId?,edgeId?}]}`。常见 code：NAME_REQUIRED、START_COUNT、END_REQUIRED、LABEL_REQUIRED、ASSIGNEE_REQUIRED、CONDITION_REQUIRED、DUPLICATE_NODE、DUPLICATE_EDGE、PORT_COUNT、INVALID_PORT、DANGLING_EDGE、SELF_EDGE、START_INCOMING、UNREACHABLE、NO_END_PATH、CYCLE。
 
-前端编辑任何属性或位置后，清空旧的校验展示并标记未保存。切换/读取/新建流程会确认放弃未保存改动；浏览器关闭/刷新由 beforeunload 提示。原型不持久化未保存草稿，离开模块前应保存。保存失败保留草稿；409 VERSION_CONFLICT 要求读取最新已保存版本，明确确认后再编辑，不静默覆盖。
+前端编辑任何属性或位置后，清空旧的校验展示并标记未保存。切换/读取/新建流程会确认放弃未保存改动；浏览器关闭/刷新由 beforeunload 提示。内部模块导航和浏览器返回会保留当前页面内的未保存草稿、选中节点、校验与提交状态，返回流程中心可以继续编辑；这不调用保存 API，也不改变已保存版本。状态只保存在页面内存，不写 localStorage，刷新仍重置。确认重置全部模拟数据会同时清空编辑状态与最近实例。保存失败保留草稿；409 VERSION_CONFLICT 要求读取最新已保存版本，明确确认后再编辑，不静默覆盖。
 
 ## 模拟实例
 
@@ -66,6 +66,8 @@ name 至少 2 字、节点名称非空、ID 唯一、每个所需出口恰好一
 启动时比较已保存流程版本，过期为 409；无效图为 422 INVALID_GRAPH，非法输入为 422 VALIDATION_ERROR。成功冻结完整 Workflow（snapshot）与 inputs，创建 version=1 实例；自动经过开始和条件节点，到审批/处理节点变为 waiting，若直接到结束则 completed。自动步数最多 31 次，作为无环校验之外的防护。
 
 WorkflowRun：id、version、snapshot、inputs、status（waiting/completed）、outcome（pending/approved/rejected/done）、currentNodeId（结束后 null）、visitedEdgeIds、trace、createdAt、updatedAt。trace 按发生顺序记录 id、nodeId、label、kind、at、outcome、message；outcome 为 entered/yes/no/waiting/approved/rejected/done/completed。日期为 ISO UTC；UI 展示 UTC。
+
+当前页面会保留最近一次模拟实例的引用；关闭面板、切换模块或浏览器返回后，可用「查看上次模拟」继续等待中的实例。流程草稿的未保存改动不进入实例快照。刷新或确认重置会清空实例；这不是后端持久化或跨设备会话。
 
 ```json
 { "version": 1, "action": "approve", "note": "仅模拟：材料符合要求" }

@@ -105,6 +105,10 @@ test('copied offline HTML saves a workflow and simulates its rejection branch wi
     await page.goto(`${pathToFileURL(file).href}#/workflows`);
     await expect(page.getByText('流程校验通过', { exact: true })).toBeVisible();
     await page.getByLabel('流程名称').fill('离线流程演示');
+    await page.getByRole('link', { name: '工单队列', exact: true }).click();
+    await expect(page.getByText('演示应用响应变慢', { exact: true })).toBeVisible();
+    await page.goBack();
+    await expect(page.getByLabel('流程名称')).toHaveValue('离线流程演示');
     await page.getByRole('button', { name: '保存草稿', exact: true }).click();
     await expect(page.getByText('已保存 v2 · 可模拟', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: '模拟运行', exact: true }).click();

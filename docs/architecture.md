@@ -20,6 +20,8 @@ UI → 统一 API 客户端 → 注入的 Fetch-compatible transport → Mock �
 
 `src/features/workflows` 提供设计器、SVG/DOM 画布与模拟面板。`src/shared/api/workflows.ts` 是契约，`src/shared/workflow/model.ts` 是纯图校验；`src/mocks/workflows.ts` 负责草稿版本、冻结实例、分支选择与逐步模拟，仍由既有 transport 提供统一 envelope 和故障注入。没有引入第三方图引擎、Ferry 源码或服务。
 
+`WorkflowSessionProvider` 在路由页面之外保留流程编辑状态，避免 Designer 卸载后丢失未保存图和最近等待实例。它仅保存页面内的 React 状态，不调用写 API，也不使用浏览器持久存储；提交状态和错误一并保留。全局 Mock 重置通过原有 revision key 同时重建这个容器，防止旧草稿或实例残留。关闭/刷新提示由容器处理，因此切换到其他模块后仍能提示未保存改动。此编辑状态容器与身份认证会话无关。
+
 保存允许语义未完成的草稿，结构错误请求不写入。只有无环且完整的已保存图可模拟。启动时复制流程与输入，等待节点动作在实例副本上校验、推进后才提交；后续定义编辑不改变实例。条件只有枚举等值比较，不执行脚本；节点负责人是虚构目录引用，不是身份或权限。流程模拟与原工单状态机相互独立，重置同时恢复两者。
 
 真实后端需要重新设计持久化版本、并发比较、未知写入结果查询、身份和资源授权；当前内存图校验与同步模拟不能替代生产工作流引擎。详细语义见 [工作流 API](workflow-api.md)，参考来源与访问限制见 [Ferry 核验记录](workflow-reference.md)。

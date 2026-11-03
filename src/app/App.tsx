@@ -39,6 +39,7 @@ import { Catalog } from '../features/catalog/Catalog';
 import { Detail } from '../features/tickets/Detail';
 import { Policies } from '../features/sla/Policies';
 import { Designer } from '../features/workflows/Designer';
+import { WorkflowSessionProvider } from '../features/workflows/WorkflowSession';
 import './styles.css';
 
 function Shell() {
@@ -143,14 +144,16 @@ function Shell() {
             description="没有真实后端或权限保护，请勿输入真实敏感信息。刷新浏览器会重置全部模拟数据；仅供流程评审，不可用于生产。"
           />
           <div key={revision}>
-            <Routes>
-              <Route path="/tickets" element={<Queue />} />
-              <Route path="/tickets/:id" element={<Detail />} />
-              <Route path="/catalog" element={<Catalog />} />
-              <Route path="/sla" element={<Policies />} />
-              <Route path="/workflows" element={<Designer />} />
-              <Route path="*" element={<Navigate replace to="/tickets" />} />
-            </Routes>
+            <WorkflowSessionProvider>
+              <Routes>
+                <Route path="/tickets" element={<Queue />} />
+                <Route path="/tickets/:id" element={<Detail />} />
+                <Route path="/catalog" element={<Catalog />} />
+                <Route path="/sla" element={<Policies />} />
+                <Route path="/workflows" element={<Designer />} />
+                <Route path="*" element={<Navigate replace to="/tickets" />} />
+              </Routes>
+            </WorkflowSessionProvider>
           </div>
           <footer className="demo-tools">
             <span>
